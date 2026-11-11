@@ -16,9 +16,10 @@ With no target name, the default (first) target is used.
 - **Laptop:** `bash`, `ssh`, `rsync`, and a `readlink` that supports `-f`
   (Linux, or recent macOS). The screenshot-folder step in Setup is macOS-only.
 - **Each VM:** `rsync` must be installed there too. rsync runs on both ends,
-  so a VM without it will fail the push or pull.
-- SSH access to each VM. Key-based auth is recommended: a push opens two SSH
-  connections per target, so password auth would prompt twice.
+  so a VM without it will fail the push or pull. shotsync checks for it first
+  and stops with `rsync is not installed on <host>`.
+- SSH access to each VM. Key-based auth is recommended: a push or pull opens
+  two SSH connections per target, so password auth would prompt twice.
 
 ## Setup (once)
 

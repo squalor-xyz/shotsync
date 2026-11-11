@@ -56,12 +56,27 @@ remote_path() {
   esac
 }
 
+# Check rsync is installed on the VM, then run an optional remote command in
+# the same ssh connection. Without rsync there, rsync itself only reports
+# "connection unexpectedly closed (code 12)".
+#   remote_prep <name> <host> [remote command]
+remote_prep() {
+  local name="$1" host="$2" rcmd="${3:-true}" rc=0
+  # shellcheck disable=SC2029  # $rcmd is meant to expand on this side
+  ssh "$host" "command -v rsync >/dev/null || exit 3; $rcmd" || rc=$?
+  case "$rc" in
+    0) ;;
+    3) die "rsync is not installed on $host (target '$name'); install it on the VM" ;;
+    *) die "ssh to $host (target '$name') failed (exit $rc)" ;;
+  esac
+}
+
 push_one() {
   local name="$1" host="$2" dir="$3" path newest
   path="$(remote_path "$dir")"
   [[ -d "$local_dir" ]] || die "local folder not found: $local_dir"
   echo "==> push $name ($host:$dir)"
-  ssh "$host" mkdir -p -- "$path"
+  remote_prep "$name" "$host" "mkdir -p -- $path"
   rsync -av --exclude 'from-*/' "$local_dir/" "$host:$path/"
   newest="$(find "$local_dir" -maxdepth 1 -type f ! -name '.*' -print0 \
     | xargs -0 ls -t 2>/dev/null | head -n 1)"
@@ -74,6 +89,7 @@ pull_one() {
   local name="$1" host="$2" dir="$3" path dest="$local_dir/from-$1"
   path="$(remote_path "$dir")"
   echo "==> pull $name ($host:$dir -> $dest)"
+  remote_prep "$name" "$host"
   mkdir -p "$dest"
   rsync -av "$host:$path/" "$dest/"
 }
