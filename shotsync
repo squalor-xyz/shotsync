@@ -42,34 +42,40 @@ select_targets() {
   fi
 }
 
-# How to show a VM-side path to paste into an agent prompt.
-display_remote() {
+# remote_dir is a full VM-side path: /abs/path, or ~/path for the VM's home.
+# "~" can't be expanded here (it's the VM's home, not ours), so turn ~/path
+# into path: ssh and rsync both resolve relative paths from the VM's home.
+# The quoted "~" patterns are literal on purpose.
+remote_path() {
+  # shellcheck disable=SC2088
   case "$1" in
-    /*) echo "$1" ;;
-    *)  # Literal "~" on purpose: VM-side path for display.
-        # shellcheck disable=SC2088
-        echo "~/$1" ;;
+    "~"|"~/") echo . ;;
+    "~/"*)    echo "${1#"~/"}" ;;
+    /*)       echo "$1" ;;
+    *)        return 1 ;;
   esac
 }
 
 push_one() {
-  local name="$1" host="$2" dir="$3" newest
+  local name="$1" host="$2" dir="$3" path newest
+  path="$(remote_path "$dir")"
   [[ -d "$local_dir" ]] || die "local folder not found: $local_dir"
   echo "==> push $name ($host:$dir)"
-  ssh "$host" mkdir -p -- "$dir"
-  rsync -av --exclude 'from-*/' "$local_dir/" "$host:$dir/"
+  ssh "$host" mkdir -p -- "$path"
+  rsync -av --exclude 'from-*/' "$local_dir/" "$host:$path/"
   newest="$(find "$local_dir" -maxdepth 1 -type f ! -name '.*' -print0 \
     | xargs -0 ls -t 2>/dev/null | head -n 1)"
   if [[ -n "$newest" ]]; then
-    echo "newest on $name: \"$(display_remote "$dir")/$(basename "$newest")\""
+    echo "newest on $name: \"${dir%/}/$(basename "$newest")\""
   fi
 }
 
 pull_one() {
-  local name="$1" host="$2" dir="$3" dest="$local_dir/from-$1"
+  local name="$1" host="$2" dir="$3" path dest="$local_dir/from-$1"
+  path="$(remote_path "$dir")"
   echo "==> pull $name ($host:$dir -> $dest)"
   mkdir -p "$dest"
-  rsync -av "$host:$dir/" "$dest/"
+  rsync -av "$host:$path/" "$dest/"
 }
 
 cmd="${1:-}"
@@ -78,6 +84,8 @@ case "$cmd" in
     selected="$(select_targets "${2:-}")"
     while read -r name host dir _; do
       [[ -n "${dir:-}" ]] || die "bad line for '$name' in $targets_file (need: name host remote_dir)"
+      remote_path "$dir" >/dev/null \
+        || die "bad remote_dir '$dir' for '$name' in $targets_file (must start with / or ~/)"
       "${cmd}_one" "$name" "$host" "$dir" </dev/null
     done <<<"$selected"
     ;;

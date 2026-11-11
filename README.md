@@ -27,12 +27,13 @@ With no target name, the default (first) target is used.
 
    ```
    # name   ssh-host    remote_dir
-   vm1      myvm        shots
+   vm1      myvm        ~/shots
    gpu      gpu-box     /data/shots
    ```
 
-   `ssh-host` is what you'd type in `ssh <host>`. A relative `remote_dir` is
-   under your home dir on the VM. Fields can't contain spaces.
+   `ssh-host` is what you'd type in `ssh <host>`. `remote_dir` is a full path
+   on the VM: absolute (`/data/shots`) or under the VM's home (`~/shots`).
+   Fields can't contain spaces.
 
 2. Put `shotsync` on your PATH, e.g. (pick a dir that's already on PATH):
 
