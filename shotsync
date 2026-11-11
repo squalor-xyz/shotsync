@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# shotsync: copy screenshots between this laptop and one or more VMs.
+#
+#   shotsync push [target|all]   laptop folder  -> VM remote_dir
+#   shotsync pull [target|all]   VM remote_dir  -> laptop folder/from-<target>/
+#   shotsync targets             list configured targets (first = default)
+#
+# Targets live in the `targets` file next to this script.
+# Local folder: $SHOTSYNC_DIR, default ~/Pictures/shotsync.
+# Nothing is ever deleted on either side.
+set -euo pipefail
+
+here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+targets_file="$here/targets"
+local_dir="${SHOTSYNC_DIR:-$HOME/Pictures/shotsync}"
+
+die() { echo "shotsync: $*" >&2; exit 1; }
+
+usage() {
+  sed -n '2,10s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+}
+
+# Print "name host remote_dir" lines, skipping comments and blanks.
+read_targets() {
+  [[ -f "$targets_file" ]] \
+    || die "no targets file: $targets_file (copy targets.example to targets and edit it)"
+  grep -Ev '^[[:space:]]*(#|$)' "$targets_file" || true
+}
+
+# Resolve a target name (or "all", or empty = default) to target lines.
+select_targets() {
+  local want="${1:-}" all
+  all="$(read_targets)" || exit 1
+  [[ -n "$all" ]] || die "no targets configured in $targets_file"
+  if [[ -z "$want" ]]; then
+    head -n 1 <<<"$all"
+  elif [[ "$want" == all ]]; then
+    echo "$all"
+  else
+    awk -v n="$want" '$1 == n' <<<"$all" | grep . \
+      || die "unknown target '$want' (see: shotsync targets)"
+  fi
+}
+
+# How to show a VM-side path to paste into an agent prompt.
+display_remote() {
+  case "$1" in
+    /*) echo "$1" ;;
+    *)  # Literal "~" on purpose: VM-side path for display.
+        # shellcheck disable=SC2088
+        echo "~/$1" ;;
+  esac
+}
+
+push_one() {
+  local name="$1" host="$2" dir="$3" newest
+  [[ -d "$local_dir" ]] || die "local folder not found: $local_dir"
+  echo "==> push $name ($host:$dir)"
+  ssh "$host" mkdir -p -- "$dir"
+  rsync -av --exclude 'from-*/' "$local_dir/" "$host:$dir/"
+  newest="$(find "$local_dir" -maxdepth 1 -type f ! -name '.*' -print0 \
+    | xargs -0 ls -t 2>/dev/null | head -n 1)"
+  if [[ -n "$newest" ]]; then
+    echo "newest on $name: \"$(display_remote "$dir")/$(basename "$newest")\""
+  fi
+}
+
+pull_one() {
+  local name="$1" host="$2" dir="$3" dest="$local_dir/from-$1"
+  echo "==> pull $name ($host:$dir -> $dest)"
+  mkdir -p "$dest"
+  rsync -av "$host:$dir/" "$dest/"
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  push|pull)
+    selected="$(select_targets "${2:-}")"
+    while read -r name host dir _; do
+      [[ -n "${dir:-}" ]] || die "bad line for '$name' in $targets_file (need: name host remote_dir)"
+      "${cmd}_one" "$name" "$host" "$dir" </dev/null
+    done <<<"$selected"
+    ;;
+  targets)
+    read_targets
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

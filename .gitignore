@@ -1,0 +1,8 @@
+# Your real targets (hostnames, paths): keep out of git.
+targets
+
+# macOS Finder metadata
+.DS_Store
+
+# Local git worktrees
+.worktrees/

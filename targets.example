@@ -1,0 +1,9 @@
+# shotsync targets: one per line, whitespace-separated.
+#   name   ssh-host   remote_dir
+# host is what you'd type in `ssh <host>`. remote_dir is relative to your home
+# dir on the VM unless it starts with /. No spaces inside fields.
+# The first target listed is the default.
+#
+# Examples (uncomment / edit):
+# vm1      myvm        shots
+# gpu      gpu-box     /data/shots
