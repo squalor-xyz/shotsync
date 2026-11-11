@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="assets/shotsync-on-light-512.png">
+    <img src="assets/shotsync-512.png" alt="shotsync logo" width="128">
+  </picture>
+</p>
+
 # shotsync
 
 Copies screenshots between the laptop and one or more VMs so agents running
@@ -82,4 +89,5 @@ To fetch images an agent produced on a VM: `shotsync pull vm1`. They land in
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The logo images in `assets/` are not covered by
+the MIT license: Copyright 2026 Squalor LLC, all rights reserved.
